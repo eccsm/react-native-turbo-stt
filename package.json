@@ -1,7 +1,7 @@
 {
   "name": "react-native-turbo-stt",
   "version": "0.1.0",
-  "description": "rn 0.76 stt package",
+  "description": "A high-performance React Native Speech-to-Text library using Turbo Modules for RN 0.76+",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
@@ -34,7 +34,7 @@
   "scripts": {
     "example": "yarn workspace react-native-turbo-stt-example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bob build",
+    "_prepare": "bob build",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "release": "release-it --only-version",
@@ -43,7 +43,12 @@
   "keywords": [
     "react-native",
     "ios",
-    "android"
+    "android",
+    "stt",
+    "speech-to-text",
+    "voice",
+    "recognition",
+    "turbo-module"
   ],
   "repository": {
     "type": "git",
