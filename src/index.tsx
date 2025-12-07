@@ -14,6 +14,22 @@ export interface SpeechError {
   message: string;
 }
 
+export const Locales = {
+  ENGLISH: 'en-US',
+  TURKISH: 'tr-TR',
+  SPANISH: 'es-ES',
+  FRENCH: 'fr-FR',
+  GERMAN: 'de-DE',
+  ITALIAN: 'it-IT',
+  PORTUGUESE: 'pt-PT',
+  JAPANESE: 'ja-JP',
+  KOREAN: 'ko-KR',
+  CHINESE: 'zh-CN',
+  RUSSIAN: 'ru-RU',
+  ARABIC: 'ar-SA',
+  HINDI: 'hi-IN',
+} as const;
+
 export function useSpeechToText() {
   const [result, setResult] = useState<SpeechResult | null>(null);
   const [error, setError] = useState<SpeechError | null>(null);
@@ -44,17 +60,22 @@ export function useSpeechToText() {
     };
   }, []);
 
-  const start = useCallback(async (locale: string = 'en-US') => {
-    try {
-      setError(null);
-      setResult(null);
-      setIsListening(true);
-      await TurboStt.startListening(locale);
-    } catch (e: any) {
-      setIsListening(false);
-      setError({ code: 'START_FAILED', message: e.message });
-    }
-  }, []);
+  const start = useCallback(
+    async (locale: string = 'en-US') => {
+      if (isListening) return;
+
+      try {
+        setError(null);
+        setResult(null);
+        setIsListening(true);
+        await TurboStt.startListening(locale);
+      } catch (e: any) {
+        setIsListening(false);
+        setError({ code: 'START_FAILED', message: e.message });
+      }
+    },
+    [isListening]
+  );
 
   const stop = useCallback(async () => {
     try {
@@ -70,6 +91,10 @@ export function useSpeechToText() {
     setIsListening(false);
   }, []);
 
+  const requestPermission = useCallback(async () => {
+    return await TurboStt.requestPermission();
+  }, []);
+
   return {
     result,
     error,
@@ -77,7 +102,15 @@ export function useSpeechToText() {
     start,
     stop,
     destroy,
+    requestPermission,
   };
 }
 
-export default TurboStt;
+// Add static methods to default export
+const TurboSttExport = {
+  ...TurboStt,
+  Locales,
+  requestPermission: TurboStt.requestPermission,
+};
+
+export default TurboSttExport;

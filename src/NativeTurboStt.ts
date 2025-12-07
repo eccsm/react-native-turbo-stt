@@ -6,6 +6,7 @@ export interface Spec extends TurboModule {
   destroy(): void;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
+  requestPermission(): Promise<boolean>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('TurboStt');

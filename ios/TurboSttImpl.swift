@@ -30,6 +30,7 @@ public class TurboSttImpl: NSObject, SFSpeechRecognizerDelegate {
       return
     }
     recognitionRequest.shouldReportPartialResults = true
+    recognitionRequest.taskHint = .dictation
 
     let inputNode = audioEngine.inputNode
     recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -81,6 +82,19 @@ public class TurboSttImpl: NSObject, SFSpeechRecognizerDelegate {
       resolve(nil)
     } else {
       resolve(nil)
+    }
+  }
+
+  @objc public func requestPermission(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+    SFSpeechRecognizer.requestAuthorization { authStatus in
+      OperationQueue.main.addOperation {
+        switch authStatus {
+        case .authorized:
+          resolve(true)
+        default:
+          resolve(false)
+        }
+      }
     }
   }
 

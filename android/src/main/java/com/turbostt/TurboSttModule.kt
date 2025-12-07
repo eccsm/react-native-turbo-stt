@@ -13,6 +13,11 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import com.facebook.react.modules.core.PermissionAwareActivity
+import com.facebook.react.modules.core.PermissionListener
 
 @ReactModule(name = TurboSttModule.NAME)
 class TurboSttModule(reactContext: ReactApplicationContext) :
@@ -23,6 +28,39 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
 
   override fun getName(): String {
     return NAME
+  }
+
+  override fun requestPermission(promise: Promise) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+      promise.resolve(true)
+      return
+    }
+
+    val context = reactApplicationContext
+    val activity = currentActivity
+
+    if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+      promise.resolve(true)
+      return
+    }
+
+    if (activity is PermissionAwareActivity) {
+      activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 101, object : PermissionListener {
+        override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>?, grantResults: IntArray?): Boolean {
+          if (requestCode == 101) {
+            if (grantResults != null && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+              promise.resolve(true)
+            } else {
+              promise.resolve(false)
+            }
+            return true
+          }
+          return false
+        }
+      })
+    } else {
+      promise.reject("NO_ACTIVITY", "Activity not found or not PermissionAware")
+    }
   }
 
   override fun startListening(locale: String, promise: Promise) {
@@ -37,6 +75,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        // Fix early cutting: Allow 5 seconds of silence
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
 
         speechRecognizer?.startListening(intent)
         promise.resolve(null)
