@@ -46,9 +46,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
 
     if (activity is PermissionAwareActivity) {
       activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 101, object : PermissionListener {
-        override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>?, grantResults: IntArray?): Boolean {
+        override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray): Boolean {
           if (requestCode == 101) {
-            if (grantResults != null && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
               promise.resolve(true)
             } else {
               promise.resolve(false)
