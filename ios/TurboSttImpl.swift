@@ -30,7 +30,7 @@ public class TurboSttImpl: NSObject, SFSpeechRecognizerDelegate {
       return
     }
     recognitionRequest.shouldReportPartialResults = true
-    recognitionRequest.taskHint = .dictation
+    recognitionRequest.taskHint = .unspecified
 
     let inputNode = audioEngine.inputNode
     recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in

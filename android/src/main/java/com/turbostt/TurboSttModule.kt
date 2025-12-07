@@ -75,9 +75,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        // Fix early cutting: Allow 5 seconds of silence
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+        // Fix early cutting: Allow 60 seconds of silence for hold-to-speak
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
 
         speechRecognizer?.startListening(intent)
         promise.resolve(null)
