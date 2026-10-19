@@ -25,6 +25,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
 
   private var speechRecognizer: SpeechRecognizer? = null
   private val mainHandler = Handler(Looper.getMainLooper())
+  private var committedTranscript = ""
+  private var lastPartial = ""
+  private var stopRequested = false
 
   override fun getName(): String {
     return NAME
@@ -66,6 +69,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
   override fun startListening(locale: String, promise: Promise) {
     mainHandler.post {
       try {
+        committedTranscript = ""
+        lastPartial = ""
+        stopRequested = false
         if (speechRecognizer == null) {
           speechRecognizer = SpeechRecognizer.createSpeechRecognizer(reactApplicationContext)
           speechRecognizer?.setRecognitionListener(TurboSttRecognitionListener())
@@ -76,8 +82,11 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         // Fix early cutting: Allow 60 seconds of silence for hold-to-speak
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
+        // RecognizerIntent documents these extras as Integer values. Some
+        // recognition services reject Long values and fall back to zero,
+        // ending and restarting the session (and replaying their system beep).
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000)
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000)
 
         speechRecognizer?.startListening(intent)
         promise.resolve(null)
@@ -90,6 +99,9 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
   override fun stopListening(promise: Promise) {
     mainHandler.post {
       try {
+        commitPendingPartial()
+        stopRequested = true
+        emitTranscript("onFinalResult", committedTranscript)
         speechRecognizer?.stopListening()
         promise.resolve(null)
       } catch (e: Exception) {
@@ -140,22 +152,75 @@ class TurboSttModule(reactContext: ReactApplicationContext) :
     override fun onResults(results: Bundle?) {
       val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
       if (!matches.isNullOrEmpty()) {
+        committedTranscript = joinTranscript(committedTranscript, matches[0])
+        lastPartial = ""
         val params = Arguments.createMap()
-        params.putString("text", matches[0])
+        params.putString("text", committedTranscript)
+        // Google's Android recognizer can keep one microphone session alive
+        // and call onResults once per phrase. Treat those phrase boundaries as
+        // partial results; the user's explicit stop is the end of the whole
+        // dictation. Otherwise every pause replaces the text in JavaScript.
+        sendEvent(if (stopRequested) "onFinalResult" else "onPartialResults", params)
+      }
+    }
+
+    override fun onSegmentResults(segmentResults: Bundle) {
+      val matches = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+      if (!matches.isNullOrEmpty()) {
+        committedTranscript = joinTranscript(committedTranscript, matches[0])
+        lastPartial = ""
+        val params = Arguments.createMap()
+        params.putString("text", committedTranscript)
+        sendEvent("onPartialResults", params)
+      }
+    }
+
+    override fun onEndOfSegmentedSession() {
+      if (committedTranscript.isNotEmpty()) {
+        val params = Arguments.createMap()
+        params.putString("text", committedTranscript)
         sendEvent("onFinalResult", params)
       }
     }
 
     override fun onPartialResults(partialResults: Bundle?) {
       val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-      if (!matches.isNullOrEmpty()) {
-        val params = Arguments.createMap()
-        params.putString("text", matches[0])
-        sendEvent("onPartialResults", params)
+      val text = matches?.firstOrNull()?.trim().orEmpty()
+      // Google's segmented recognizer on some Samsung devices reports only
+      // partial results. A blank partial is its phrase boundary; keep the last
+      // non-blank hypothesis before the next phrase starts.
+      if (text.isEmpty()) {
+        if (commitPendingPartial()) emitTranscript("onPartialResults", committedTranscript)
+        return
       }
+      lastPartial = text
+      emitTranscript("onPartialResults", joinTranscript(committedTranscript, text))
     }
 
     override fun onEvent(eventType: Int, params: Bundle?) {}
+  }
+
+  private fun joinTranscript(committed: String, current: String): String {
+    val before = committed.trim()
+    val now = current.trim()
+    if (before.isEmpty()) return now
+    if (now.isEmpty() || before.endsWith(now, ignoreCase = true)) return before
+    if (now.startsWith(before, ignoreCase = true)) return now
+    return "$before $now"
+  }
+
+  private fun commitPendingPartial(): Boolean {
+    if (lastPartial.isEmpty()) return false
+    committedTranscript = joinTranscript(committedTranscript, lastPartial)
+    lastPartial = ""
+    return true
+  }
+
+  private fun emitTranscript(eventName: String, text: String) {
+    if (text.isEmpty()) return
+    val params = Arguments.createMap()
+    params.putString("text", text)
+    sendEvent(eventName, params)
   }
 
   private fun getErrorMessage(errorCode: Int): String {
